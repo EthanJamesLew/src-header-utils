@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use git2::{Repository, BlameOptions, Time, Commit};
-use chrono::NaiveDateTime;
+use git2::{Repository, BlameOptions, Time};
+use chrono::DateTime;
 
 pub struct HistoryLog {
     entries: HashMap<(String, String), Vec<String>>, // (Date, Author Email) -> Vec of messages
@@ -48,7 +48,7 @@ impl HistoryLog {
     }
 
     fn time_to_string(time: Time) -> String {
-        let datetime = NaiveDateTime::from_timestamp(time.seconds(), 0);
+        let datetime = DateTime::from_timestamp(time.seconds(), 0).expect("invalid timestamp!");
         datetime.format("%m/%d/%Y").to_string()
     }
 
