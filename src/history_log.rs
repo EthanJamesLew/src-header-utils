@@ -1,4 +1,4 @@
-use chrono::{NaiveDateTime, DateTime, Utc};
+use chrono::{DateTime, Utc, TimeZone};
 use git2::{BlameOptions, Repository};
 use std::collections::HashMap;
 use std::fs;
@@ -35,7 +35,11 @@ impl HistoryLog {
         entry.push(message);
     }
 
-    pub fn from_git_blame(repo_path: &str, file_path: &str, branch_name: &str) -> Result<Self, git2::Error> {
+    pub fn from_git_blame(
+        repo_path: &str,
+        file_path: &str,
+        branch_name: &str,
+    ) -> Result<Self, git2::Error> {
         let repo = Repository::open(repo_path)?;
         let reference = format!("refs/heads/{}", branch_name);
         let commit = repo.find_reference(&reference)?.peel_to_commit()?;
@@ -55,19 +59,28 @@ impl HistoryLog {
             let commit = repo.find_commit(commit_id)?;
             let author = commit.author();
             let time = commit.time();
-            let date = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(time.seconds(), 0), Utc);
+            let date =
+                Utc.from_utc_datetime(&DateTime::from_timestamp(time.seconds(), 0).unwrap().naive_utc());
             let line_start = hunk.final_start_line();
             let line_count = hunk.lines_in_hunk();
-            let lines = (line_start..line_start + line_count).map(|i| Line {
-                line_no: i,
-                line: file_lines.get(i).unwrap_or(&String::from("<error>")).to_string(),
-            }).collect();
+            let lines = (line_start..line_start + line_count)
+                .map(|i| Line {
+                    line_no: i,
+                    line: file_lines
+                        .get(i)
+                        .unwrap_or(&String::from("<error>"))
+                        .to_string(),
+                })
+                .collect();
 
             let message = Message {
                 author_email: author.email().unwrap_or("<UNKNOWN EMAIL>").to_string(),
                 date,
                 commit_id: commit_id.to_string(),
-                message: commit.summary().unwrap_or("<NO COMMIT MESSAGE>").to_string(),
+                message: commit
+                    .summary()
+                    .unwrap_or("<NO COMMIT MESSAGE>")
+                    .to_string(),
                 lines: lines,
             };
             log.add_entry(message);
@@ -81,7 +94,10 @@ impl HistoryLog {
         for ((date, author), messages) in &self.entries {
             result.push_str(&format!("{} - {}\n", date, author));
             for message in messages {
-                result.push_str(&format!("    -- {} ({})\n", message.message, message.commit_id));
+                result.push_str(&format!(
+                    "    -- {} ({})\n",
+                    message.message, message.commit_id
+                ));
                 for line in &message.lines {
                     result.push_str(&format!("        {} {}\n", line.line_no, line.line));
                 }
@@ -95,4 +111,3 @@ impl HistoryLog {
         format!("Take the history log: {}\nWrite a timeline change that summarizes the history. Use a bullet list formatted as: * {{date}} - {{author}} - {{summary}}", history_string)
     }
 }
-
