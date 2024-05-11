@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, TimeZone, Utc};
 use git2::{BlameOptions, Repository};
 use std::collections::HashMap;
 use std::fs;
@@ -59,8 +59,11 @@ impl HistoryLog {
             let commit = repo.find_commit(commit_id)?;
             let author = commit.author();
             let time = commit.time();
-            let date =
-                Utc.from_utc_datetime(&DateTime::from_timestamp(time.seconds(), 0).unwrap().naive_utc());
+            let date = Utc.from_utc_datetime(
+                &DateTime::from_timestamp(time.seconds(), 0)
+                    .unwrap()
+                    .naive_utc(),
+            );
             let line_start = hunk.final_start_line();
             let line_count = hunk.lines_in_hunk();
             let lines = (line_start..line_start + line_count)
@@ -108,6 +111,6 @@ impl HistoryLog {
 
     pub fn prompt(&self) -> String {
         let history_string = self.format_history();
-        format!("Take the history log: {}\nWrite a timeline change that summarizes the history. Use a bullet list formatted as: * {{date}} - {{author}} - {{summary}}", history_string)
+        format!("Generate a changelog summary based on the following git and source file changes. {}\nThe changelog should be formatted as a timeline, be concise yet detailed enough to capture all significant modifications, and adhere to typical documentation style. Each entry should include the date, file name, type of change (e.g., feature, fix, refactor), and a brief description of the change.", history_string)
     }
 }
