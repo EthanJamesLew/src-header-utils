@@ -81,7 +81,7 @@ impl HistoryLog {
                     .summary()
                     .unwrap_or("<NO COMMIT MESSAGE>")
                     .to_string(),
-                lines: lines,
+                lines,
             };
             log.add_entry(message);
         }
