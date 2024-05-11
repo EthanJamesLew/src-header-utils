@@ -39,10 +39,10 @@ impl HistoryLog {
         let repo = Repository::open(repo_path)?;
         let reference = format!("refs/heads/{}", branch_name);
         let commit = repo.find_reference(&reference)?.peel_to_commit()?;
-        let path = std::path::Path::new(file_path);
+        let path = Path::new(file_path);
         let mut blame_options = BlameOptions::new();
         let full_path = Path::new(repo_path).join(path);
-        let file_contents = fs::read_to_string(full_path).expect("unable to read string");
+        let file_contents = fs::read_to_string(full_path).expect("Unable to read string");
         let file_lines: Vec<String> = file_contents.lines().map(String::from).collect();
 
         blame_options.newest_commit(commit.id());
@@ -52,14 +52,17 @@ impl HistoryLog {
 
         for hunk in blame.iter() {
             let commit_id = hunk.final_commit_id();
-           
             let commit = repo.find_commit(commit_id)?;
             let author = commit.author();
             let time = commit.time();
             let date = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(time.seconds(), 0), Utc);
             let line_start = hunk.final_start_line();
             let line_count = hunk.lines_in_hunk();
-            let lines = (line_start..line_start+line_count).map(|i| Line{line_no: i, line: file_lines.get(i).unwrap_or(&String::from("<error>")).to_string()}).collect();
+            let lines = (line_start..line_start + line_count).map(|i| Line {
+                line_no: i,
+                line: file_lines.get(i).unwrap_or(&String::from("<error>")).to_string(),
+            }).collect();
+
             let message = Message {
                 author_email: author.email().unwrap_or("<UNKNOWN EMAIL>").to_string(),
                 date,
@@ -73,17 +76,23 @@ impl HistoryLog {
         Ok(log)
     }
 
-    pub fn pretty_print(&self) {
-        println!("HISTORY");
+    pub fn format_history(&self) -> String {
+        let mut result = String::from("HISTORY\n");
         for ((date, author), messages) in &self.entries {
-            println!("{} - {}", date, author);
+            result.push_str(&format!("{} - {}\n", date, author));
             for message in messages {
-                println!("    -- {} ({})", message.message, message.commit_id);
+                result.push_str(&format!("    -- {} ({})\n", message.message, message.commit_id));
                 for line in &message.lines {
-                    println!("        {} {}", line.line_no, line.line);
+                    result.push_str(&format!("        {} {}\n", line.line_no, line.line));
                 }
             }
         }
+        result
+    }
+
+    pub fn prompt(&self) -> String {
+        let history_string = self.format_history();
+        format!("Take the history log: {}\nWrite a timeline change that summarizes the history. Use a bullet list formatted as: * {{date}} - {{author}} - {{summary}}", history_string)
     }
 }
 
