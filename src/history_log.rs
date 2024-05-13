@@ -4,11 +4,13 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+#[derive(Clone, PartialEq)]
 pub struct Line {
     line_no: usize,
     line: String,
 }
 
+#[derive(Clone)]
 pub struct Message {
     author_email: String,
     date: DateTime<Utc>,
@@ -18,7 +20,7 @@ pub struct Message {
 }
 
 pub struct HistoryLog {
-    entries: HashMap<(String, String), Vec<Message>>,
+    entries: HashMap<String, Message>,
 }
 
 impl HistoryLog {
@@ -29,10 +31,10 @@ impl HistoryLog {
     }
 
     pub fn add_entry(&mut self, message: Message) {
-        let date = message.date.format("%m/%d/%Y").to_string();
-        let key = (date, message.author_email.clone());
-        let entry = self.entries.entry(key).or_default();
-        entry.push(message);
+        let entry = self.entries.entry(message.commit_id.clone()).or_insert_with(|| message.clone());
+        if entry.lines != message.lines {
+            entry.lines.extend(message.lines.iter().cloned());
+        }
     }
 
     pub fn from_git_blame(
@@ -70,7 +72,7 @@ impl HistoryLog {
                 .map(|i| Line {
                     line_no: i,
                     line: file_lines
-                        .get(i)
+                        .get(i - 1) // adjust index
                         .unwrap_or(&String::from("<error>"))
                         .to_string(),
                 })
@@ -94,18 +96,25 @@ impl HistoryLog {
 
     pub fn format_history(&self) -> String {
         let mut result = String::from("HISTORY\n");
-        for ((date, author), messages) in &self.entries {
-            result.push_str(&format!("{} - {}\n", date, author));
-            for message in messages {
-                result.push_str(&format!(
-                    "    -- {} ({})\n",
-                    message.message, message.commit_id
-                ));
-                for line in &message.lines {
-                    result.push_str(&format!("        {} {}\n", line.line_no, line.line));
-                }
+        
+        // Collect and sort entries by date
+        let mut sorted_entries: Vec<&Message> = self.entries.values().collect();
+        sorted_entries.sort_by_key(|message| message.date);
+
+        // Format sorted entries into result string
+        for message in sorted_entries {
+            result.push_str(&format!(
+                "{} - {} ({}):\n    -- {}\n",
+                message.date.format("%m/%d/%Y"),
+                message.author_email,
+                message.commit_id,
+                message.message
+            ));
+            for line in &message.lines {
+                result.push_str(&format!("        {}: {}\n", line.line_no, line.line));
             }
         }
+
         result
     }
 
@@ -114,3 +123,4 @@ impl HistoryLog {
         format!("Generate a changelog summary based on the following git and source file changes. {}\nThe changelog should be formatted as a timeline, be concise yet detailed enough to capture all significant modifications, and adhere to typical documentation style. Each entry should include the date, file name, type of change (e.g., feature, fix, refactor), and a brief description of the change.", history_string)
     }
 }
+
