@@ -45,6 +45,13 @@ async fn main() {
                 .help("Directory to Git Repo"),
         )
         .arg(
+            Arg::new("prompt")
+                .short('x')
+                .long("prompt")
+                .takes_value(false)
+                .help("print the prompt that would be sent to LLM"),
+        )
+        .arg(
             Arg::new("file_path")
                 .short('f')
                 .long("file")
@@ -61,20 +68,20 @@ async fn main() {
                 .help("Branch or commit"),
         )
         .arg(
-            Arg::new("ollama_port")
-                .short('p')
-                .long("port")
-                .takes_value(true)
-                .default_value("11434")
-                .help("Port number for the Ollama service"),
-        )
-        .arg(
             Arg::new("ollama_model")
                 .short('m')
                 .long("model")
                 .takes_value(true)
                 .default_value("mistral:latest")
                 .help("LLM Model for the Ollama service"),
+        )
+        .arg(
+            Arg::new("ollama_port")
+                .short('p')
+                .long("port")
+                .takes_value(true)
+                .default_value("11434")
+                .help("Port number for the Ollama service"),
         )
         .arg(
             Arg::new("ollama_address")
@@ -86,16 +93,22 @@ async fn main() {
         )
         .get_matches();
 
+    let print_prompt = matches.is_present("prompt");
     let repo_path = matches.value_of("repo").unwrap();
     let file_path = matches.value_of("file_path").unwrap();
     let branch_name = matches.value_of("branch").unwrap();
     let ollama_port: u16 = matches.value_of_t("ollama_port").unwrap();
     let ollama_model = matches.value_of("ollama_model").unwrap().to_string();
     let ollama_address = matches.value_of("ollama_address").unwrap().to_string();
+    let hl = HistoryLog::from_git_blame(repo_path, file_path, branch_name);
 
-    match HistoryLog::from_git_blame(repo_path, file_path, branch_name) {
+    match hl  {
         Ok(log) => {
-            run_prompt(ollama_address, ollama_port, ollama_model, log.prompt()).await;
+            if print_prompt {
+                println!("{}", log.prompt());
+            } else {
+                run_prompt(ollama_address, ollama_port, ollama_model, log.prompt()).await;
+            }
         }
         Err(e) => {
             eprintln!("Error processing git blame: {}", e);
